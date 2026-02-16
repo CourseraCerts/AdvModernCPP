@@ -22,3 +22,7 @@ add_executable(M1s8 stlAlgoPractice_2.cpp)
 
 add_executable(M1s9 stlAlgoPipeline_practice.cpp)
 add_executable(M1s10 stlAlgoPipeline_practice_range.cpp)
+
+add_executable(M1s21 stl_Iterator_functor.cpp)
+add_executable(M1s22 stl_Iterator_functor_2.cpp)
+add_executable(M1s23 stl_Iterator_functor_ranges.cpp)

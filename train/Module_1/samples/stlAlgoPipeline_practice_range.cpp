@@ -83,17 +83,17 @@ class CalculateDerivedValues {
 // TODO: Simple helper functions (alternatives to complex function objects)
 bool hasValidAmount(const Transaction& t) {
   // TODO: Return true if amount > 0
-  return t.amount > 0;  // Placeholder
+  return false;  // Placeholder
 }
 
 bool hasValidCustomer(const Transaction& t) {
   // TODO: Return true if customerId is not empty
-  return !(t.customerId.length() == 0);  // Placeholder
+  return false;  // Placeholder
 }
 
 double extractFinalTotal(const Transaction& t) {
   // TODO: Return the finalTotal field
-  return t.finalTotal;  // Placeholder
+  return 0.0;  // Placeholder
 }
 
 // TODO: Comparison functions for sorting
@@ -296,7 +296,7 @@ class AlgorithmPipeline {
       // Display top entries in this region
       for (size_t i = 0; i < topCount; ++i) {
         cout << "  #" << (i + 1) << ": " << regionTransactions[i].customerId << " - $"
-             << regionTransactions[i].finalTotal << " : " << regionTransactions[i].region << endl;
+             << regionTransactions[i].finalTotal << endl;
       }
     }
   }

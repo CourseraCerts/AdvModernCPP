@@ -128,13 +128,22 @@ class AlgorithmPipeline {
     IsValidTransaction isValid;
 
     // TODO: Use copy_if to filter valid transactions
-    validTransactions.clear();
-    copy_if(rawTransactions.begin(), rawTransactions.end(), back_inserter(validTransactions), isValid);
+    // validTransactions.clear();
+    // copy_if(rawTransactions.begin(), rawTransactions.end(), back_inserter(validTransactions), isValid);
 
     // TODO: Count invalid transactions using count_if
     // You can create a "not valid" predicate or count and subtract
-    auto invalid_count = std::count_if(rawTransactions.begin(), rawTransactions.end(),
-                                       [&isValid](Transaction& t) { return !isValid(t); });
+    // auto invalid_count = std::count_if(rawTransactions.begin(), rawTransactions.end(),
+    //                                    [&isValid](Transaction& t) { return !isValid(t); });
+
+    // start with a copy of the raw data
+    validTransactions = rawTransactions;
+    auto newEnd = std::remove_if(validTransactions.begin(), validTransactions.end(),
+                                 [&isValid](const Transaction& t) { return !isValid(t); });
+    // count how many were removed
+    size_t invalid_count = std::distance(newEnd, validTransactions.end());
+
+    validTransactions.erase(newEnd, validTransactions.end());
 
     // TODO: Display statistics
     cout << "Valid transactions: " << validTransactions.size() << endl;
@@ -204,6 +213,10 @@ class AlgorithmPipeline {
     cout << fixed << setprecision(2);
     cout << "Total Revenue: $" << totalRevenue << endl;
     cout << "Average Transaction: $" << average << endl;
+    cout << "Highest  Transactions : " << min_max.first->finalTotal << "(Customer: " << min_max.first->customerId << ")"
+         << endl;
+    cout << "Lowest  Transactions : " << min_max.second->finalTotal << "(Customer: " << min_max.second->customerId
+         << ")" << endl;
     cout << "High-Value Transactions (>$500): " << highValueCount << endl;
   }
 
