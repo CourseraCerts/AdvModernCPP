@@ -12,6 +12,7 @@ Resource cleanup occurs even when exceptions are thrown
 */
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <iostream>
 #include <mutex>
 #include <random>
@@ -30,6 +31,11 @@ class ThreadGuard {
 
  public:
   explicit ThreadGuard(std::thread& t) : thread_(t) {}
+
+  // move constructible so it can be stored in containers like std::vector
+  ThreadGuard(ThreadGuard&& other) noexcept : thread_(other.thread_) {}
+  // references can't be rebound, so disable move assignment
+  ThreadGuard& operator=(ThreadGuard&&) = delete;
 
   ~ThreadGuard() {
     if (thread_.joinable()) {
@@ -62,43 +68,22 @@ void riskAnalyzer(int analyzerId, const std::vector<double>& data, double& resul
     result = -1.0;
   }
 }
-void dataProcessor(int processorId, int itemCount) {
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_real_distribution<> dis(1.0, 100.0);
 
-  for (int i = 0; i < itemCount; ++i) {
-    double value = dis(gen);
-
-    // Thread-safe data insertion
-    {
-      std::lock_guard<std::mutex> lock(dataMutex);
-      sharedData.push_back(value);
-    }
-
-    processedCount.fetch_add(1);
-
-    // Simulate processing time
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  }
-
-  std::cout << "Processor " << processorId << " completed processing " << itemCount << " items\n";
-}
-
-int main() {
+int test() {
   std::vector<std::thread> threads;
-  for (int i = 0; i < 5; ++i) {
-    threads.emplace_back(dataProcessor, i, 20);
+  std::vector<double> result(3);
+  std::vector<ThreadGuard> tg;
+  std::vector<std::vector<double>> segments = {{1.0, 2.0, 3.0, 4.0, 5.0}, {6.0, 7.0, 8.0}, {}};
+  for (int i = 0; i < 3; ++i) {
+    threads.emplace_back(riskAnalyzer, i, std::ref(segments[i]), std::ref(result[i]));
   }
   for (auto& t : threads) {
-    t.join();
+    tg.emplace_back(t);
   }
-  std::cout << "total procesed" << processedCount.load() << std::endl;
-  std::cout << "DAta size: " << sharedData.size() << std::endl;
-  for (auto& val : sharedData) {
-    std::cout << val << " ";
-  }
-  std::cout << "\n";
-
   return 0;
+}
+int main() {
+  auto result = test();
+  std::cout << "Done" << std::endl;
+  return result;
 }
