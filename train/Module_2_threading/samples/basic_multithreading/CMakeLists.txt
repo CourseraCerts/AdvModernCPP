@@ -22,3 +22,9 @@ target_link_libraries(M2s1 PRIVATE Threads::Threads)
 
 add_executable(M2s2__2 thread_pool_latest_older.cpp)
 target_link_libraries(M2s1 PRIVATE Threads::Threads)
+
+add_executable(M2s3 condition_variables.cpp)
+target_link_libraries(M2s1 PRIVATE Threads::Threads)
+
+add_executable(M2s4 thread_lifecycle.cpp)
+target_link_libraries(M2s1 PRIVATE Threads::Threads)
