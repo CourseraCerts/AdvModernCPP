@@ -20,3 +20,6 @@ target_link_libraries(M2s11 PRIVATE Threads::Threads)
 
 add_executable(M2s13 producer_consumer_pq.cpp)
 target_link_libraries(M2s11 PRIVATE Threads::Threads)
+
+add_executable(M2s13_1 producer_consumer_pq_ai.cpp)
+target_link_libraries(M2s11 PRIVATE Threads::Threads)
