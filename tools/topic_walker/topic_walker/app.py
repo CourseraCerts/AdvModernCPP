@@ -236,6 +236,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._navigation = NavigationTrail()
         self._zoom_factor = 1.0
         self._base_font_size = self.font().pointSizeF() or 12.0
+        self._new_prompt_tags: List[str] = []
 
         self.setWindowTitle("C++ Topic Walker")
         self.resize(1080, 720)
@@ -271,21 +272,37 @@ class MainWindow(QtWidgets.QMainWindow):
         self._prompt_edit.setPlaceholderText("Describe the topic or question…")
         self._prompt_edit.setFixedHeight(80)
 
-        tags_label = QtWidgets.QLabel("Tags (comma separated, first tag is the source)")
-        self._tags_edit = QtWidgets.QLineEdit()
-        self._tags_edit.setPlaceholderText("constexpr, lookup table, template metaprogramming")
+        tags_label = QtWidgets.QLabel("Tags (first tag is the source)")
+        self._tag_input = QtWidgets.QLineEdit()
+        self._tag_input.setPlaceholderText("Add a tag and press Enter")
+        self._tag_input.returnPressed.connect(self._handle_add_tag)
 
-        add_btn = QtWidgets.QPushButton("Add Prompt")
-        add_btn.clicked.connect(self._handle_add_prompt)
+        add_tag_btn = QtWidgets.QPushButton("Add Tag")
+        add_tag_btn.clicked.connect(self._handle_add_tag)
+
+        self._tag_list_widget = QtWidgets.QWidget()
+        self._tag_list_layout = QtWidgets.QVBoxLayout(self._tag_list_widget)
+        self._tag_list_layout.setContentsMargins(0, 0, 0, 0)
+        self._tag_list_layout.setSpacing(4)
+        self._refresh_new_prompt_tags()
+
+        add_prompt_btn = QtWidgets.QPushButton("Add Prompt")
+        add_prompt_btn.clicked.connect(self._handle_add_prompt)
 
         container = QtWidgets.QVBoxLayout()
         container.addWidget(prompt_label)
         container.addWidget(self._prompt_edit)
         container.addWidget(tags_label)
-        row = QtWidgets.QHBoxLayout()
-        row.addWidget(self._tags_edit)
-        row.addWidget(add_btn)
-        container.addLayout(row)
+        tag_entry_row = QtWidgets.QHBoxLayout()
+        tag_entry_row.addWidget(self._tag_input)
+        tag_entry_row.addWidget(add_tag_btn)
+        container.addLayout(tag_entry_row)
+        container.addWidget(self._tag_list_widget)
+
+        submit_row = QtWidgets.QHBoxLayout()
+        submit_row.addStretch(1)
+        submit_row.addWidget(add_prompt_btn)
+        container.addLayout(submit_row)
         return container
 
     def _build_mode_selector(self) -> QtWidgets.QWidget:
@@ -348,16 +365,91 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _handle_add_prompt(self) -> None:
         prompt = self._prompt_edit.toPlainText().strip()
-        tags = [tag.strip() for tag in self._tags_edit.text().split(",") if tag.strip()]
+        tags = list(self._new_prompt_tags)
+        if not tags:
+            QtWidgets.QMessageBox.warning(self, "Validation", "Please add at least one tag before saving.")
+            return
         try:
             self._db.add_prompt(prompt, tags)
         except ValueError as exc:
             QtWidgets.QMessageBox.warning(self, "Invalid data", str(exc))
             return
         self._prompt_edit.clear()
-        self._tags_edit.clear()
+        self._tag_input.clear()
+        self._new_prompt_tags.clear()
+        self._refresh_new_prompt_tags()
         self._status_label.setText("Prompt saved.")
         self._refresh_view()
+
+    def _handle_add_tag(self) -> None:
+        tag = self._tag_input.text().strip()
+        if not tag:
+            self._status_label.setText("Enter a tag before adding.")
+            return
+        lowered = tag.lower()
+        if any(existing.lower() == lowered for existing in self._new_prompt_tags):
+            self._status_label.setText("Tag already added.")
+            self._tag_input.selectAll()
+            return
+        self._new_prompt_tags.append(tag)
+        self._tag_input.clear()
+        self._refresh_new_prompt_tags()
+        self._status_label.setText("Tag added.")
+
+    def _edit_new_tag(self, index: int) -> None:
+        current_tag = self._new_prompt_tags[index]
+        new_tag, accepted = QtWidgets.QInputDialog.getText(self, "Edit Tag", "Tag:", text=current_tag)
+        if not accepted:
+            return
+        new_tag = new_tag.strip()
+        if not new_tag:
+            QtWidgets.QMessageBox.warning(self, "Validation", "Tag cannot be empty.")
+            return
+        lowered = new_tag.lower()
+        if any(existing.lower() == lowered for idx, existing in enumerate(self._new_prompt_tags) if idx != index):
+            QtWidgets.QMessageBox.warning(self, "Validation", "Tag already exists.")
+            return
+        self._new_prompt_tags[index] = new_tag
+        self._refresh_new_prompt_tags()
+        self._status_label.setText("Tag updated.")
+
+    def _delete_new_tag(self, index: int) -> None:
+        del self._new_prompt_tags[index]
+        self._refresh_new_prompt_tags()
+        self._status_label.setText("Tag removed.")
+
+    def _refresh_new_prompt_tags(self) -> None:
+        while self._tag_list_layout.count():
+            item = self._tag_list_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        if not self._new_prompt_tags:
+            placeholder = QtWidgets.QLabel("No tags added yet.")
+            placeholder.setEnabled(False)
+            self._tag_list_layout.addWidget(placeholder)
+            return
+
+        for index, tag in enumerate(self._new_prompt_tags):
+            item_widget = QtWidgets.QWidget()
+            item_layout = QtWidgets.QHBoxLayout(item_widget)
+            item_layout.setContentsMargins(0, 0, 0, 0)
+            item_layout.addWidget(QtWidgets.QLabel(tag))
+            item_layout.addStretch(1)
+
+            edit_btn = QtWidgets.QPushButton("Edit")
+            edit_btn.clicked.connect(lambda _, idx=index: self._edit_new_tag(idx))
+            delete_btn = QtWidgets.QPushButton("Delete")
+            delete_btn.clicked.connect(lambda _, idx=index: self._delete_new_tag(idx))
+
+            button_row = QtWidgets.QHBoxLayout()
+            button_row.setContentsMargins(0, 0, 0, 0)
+            button_row.setSpacing(4)
+            button_row.addWidget(edit_btn)
+            button_row.addWidget(delete_btn)
+
+            item_layout.addLayout(button_row)
+            self._tag_list_layout.addWidget(item_widget)
 
     def _navigate_to_tag(self, tag: str) -> None:
         self._navigation.push(self._view_mode, self._filter_value)

@@ -27,9 +27,9 @@ For the account balance to remain accurate, all these operations for each accoun
 
 Create -- need to lock the mutex at the bank level, so no two creation requests can overlap.
 
-Credit, Debit need to lock a mutex at account level. 
+Credit/Debit -- need to lock a mutex at account level. 
 
-transfer needs to lock the mutex for both the accounts and subsequently the same account mutex will be locked by credit on one account and debit on the other account.
+transfer -- needs to lock the mutex for both the accounts and subsequently the same account mutex will be locked by credit on one account and debit on the other account. So this needs a recursive mutex, such that the same mutex can be locked when entering transfer function call and subsequently acquiring the lock on the mutex should succeed again when transfer invokes credit on one account and debit on second account.
 
 close the account also need to lock the mutex at bank level so it can be resolved in a serial fashion.
 
@@ -37,7 +37,7 @@ Based on this we need below setup.
 
 bank_mutex -- a classic mutex at the back class level, which is locked for create and close account api calls.
 
-account_mutex -- a recursive mutex to support multiple locks on the same mutex on the transfer and credit/debit operations. This is the case where we have multiple resources getting locked together.
+account_mutex -- a recursive mutex to support multiple locks on the same mutex on the transfer and credit/debit operations. This is the case where we have multiple resources getting locked together. If recursive lock is not used, the second call to lock in debit/credit after the lock on respective accounts have been acquired in tranfer will enter a deadlock.
 
 Since credit/debit/transfer only lock the mutex at account level, operations on different accounts can happen in parallel.
 
@@ -66,40 +66,11 @@ Proficient: Describes an effective technique for preventing deadlock, with some 
 5 points
 Excellent: Provides a detailed and clear description of a technique for preventing deadlock, including examples and explanation of its effectiveness and application.
 
-Status: 4/5 points
-4/5 points
-Thread-safe Account Class Design
+##### Thread-safe Account Class Design ----- Status: 4/5 points
 
 You discussed the design of a thread-safe account class with a focus on using mutexes at different levels. While this shows consideration for performance, the discussion could be more comprehensive with specific examples or techniques to maintain performance. Consider exploring additional strategies or examples to enhance your design approach.
 
-How useful is this feedback?
-0 points
-Inadequate: Does not discuss the design of a thread-safe account class or discussion is incorrect.
 
-2 points
-Basic: Discusses the design of a thread-safe account class with minimal detail or consideration of performance.
-
-4 points
-Proficient: Discusses the design of a thread-safe account class with consideration for performance, but lacks depth or specific examples.
-
-5 points
-Excellent: Provides a comprehensive discussion on designing a thread-safe account class, including specific techniques and examples for maintaining performance.
-
-Status: 4/5 points
-4/5 points
-Synchronization Necessity Explanation
+##### Synchronization Necessity Explanation ------ Status: 4/5 points
 
 Your explanation of synchronization necessity is somewhat clear, as you mentioned that all operations need synchronization. However, it would be beneficial to provide more examples and context to differentiate between situations that require synchronization and those that do not. This will help solidify your understanding and application of synchronization in various scenarios.
-
-How useful is this feedback?
-0 points
-Inadequate: Does not explain the difference between situations that require synchronization and those that do not, or explanation is incorrect.
-
-2 points
-Basic: Explains the difference between situations that require synchronization and those that do not, but lacks detail or clarity.
-
-4 points
-Proficient: Explains the difference between situations that require synchronization and those that do not, with some examples and clarity.
-
-5 points
-Excellent: Provides a clear and detailed explanation of the difference between situations that require synchronization and those that do not, with relevant examples and context.
