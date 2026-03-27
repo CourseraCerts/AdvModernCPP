@@ -19,10 +19,26 @@ Using the code below, create a load testing scenario that:
 #include <condition_variable>
 #include <functional>
 #include <iostream>
+#include <mutex>
 #include <queue>
+#include <random>
+#include <ranges>
 #include <thread>
-
+constexpr auto MAX_SIM = 5;
 enum class TaskPriority { LOW = 1, NORMAL = 2, HIGH = 3, CRITICAL = 4 };
+template <typename E>
+constexpr auto get_val(E e) noexcept {
+  return static_cast<std::underlying_type_t<E>>(e);
+}
+namespace {
+std::mutex gLogMutex;
+template <typename... Args>
+void logSync(std::ostream& stream, Args&&... args) {
+  std::scoped_lock lock(gLogMutex);
+  (stream << ... << args);
+  stream.flush();
+}
+}  // namespace
 
 struct Task {
   std::function<void()> function;
@@ -64,6 +80,8 @@ class DynamicThreadPool {
   std::atomic<double> averageTaskTime_{0.0};
   std::atomic<size_t> queueHighWaterMark_{0};
 
+  std::chrono::steady_clock::time_point t0;
+
   void workerThread() {
     while (!shutdown_.load()) {
       Task task([]() {}, TaskPriority::LOW);
@@ -91,6 +109,9 @@ class DynamicThreadPool {
         auto startTime = std::chrono::steady_clock::now();
 
         try {
+          auto submit_offset = std::chrono::duration_cast<std::chrono::microseconds>(task.submitTime - t0).count();
+          logSync(std::cout, " processing task (" + std::to_string(get_val(task.priority)) + ") : " + task.taskId +
+                                 "\t task order by time: " + std::to_string(submit_offset) + "\n");
           task.function();
         } catch (const std::exception& e) {
           std::cout << "Task " << task.taskId << " failed: " << e.what() << std::endl;
@@ -157,6 +178,7 @@ class DynamicThreadPool {
 
     std::cout << "Dynamic thread pool initialized with " << minThreads << " threads (max: " << maxThreads << ")"
               << std::endl;
+    this->t0 = std::chrono::steady_clock::now();
   }
 
   ~DynamicThreadPool() { shutdown(); }
@@ -210,11 +232,53 @@ class DynamicThreadPool {
   void printStats() const {
     auto stats = getStats();
     std::cout << "\n=== Thread Pool Statistics ===" << std::endl;
-    std::cout << "Current threads: " << stats.currentThreads << std::endl;
-    std::cout << "Active threads: " << stats.activeThreads << std::endl;
-    std::cout << "Queue size: " << stats.queueSize << std::endl;
-    std::cout << "Total tasks processed: " << stats.totalTasksProcessed << std::endl;
+    std::cout << "Current threads: " << stats.currentThreads << " | \t Active threads: " << stats.activeThreads
+              << std::endl;
+    std::cout << "Queue size: " << stats.queueSize << " | \t Total tasks processed: " << stats.totalTasksProcessed
+              << std::endl;
     std::cout << "Average task time: " << stats.averageTaskTime << " ms" << std::endl;
     std::cout << "Queue high water mark: " << stats.queueHighWaterMark << std::endl;
   }
 };
+
+auto getWork(int val) {
+  auto work = [val]() {
+    // logSync(std::cout, "\t processing Task: ", val);
+    std::this_thread::sleep_for(std::chrono::milliseconds(val));
+  };
+  return std::move(work);
+}
+void runTaskGenerator(DynamicThreadPool& dtp, int sim_id, int task_count) {
+  std::mt19937 rng(std::random_device{}());
+  std::uniform_int_distribution<int> dist(get_val(TaskPriority::LOW), get_val(TaskPriority::CRITICAL));
+  for (auto val : std::ranges::iota_view(1, task_count + 1)) {
+    int taskId = sim_id * 1000 + val;
+    auto priority = static_cast<TaskPriority>(dist(rng) % (get_val(TaskPriority::CRITICAL) + 1));
+    auto now = std::chrono::steady_clock::now();
+    auto function = getWork(taskId);
+    dtp.submit(std::move(function), priority, std::to_string(taskId));
+  }
+}
+
+int main() {
+  for (auto val : std::ranges::iota_view(2, MAX_SIM + 1)) {
+    DynamicThreadPool dtp;
+    logSync(std::cout, "starting with events: " + std::to_string(100 * val));
+    runTaskGenerator(dtp, val, 100 * val);
+    std::jthread monitor([&dtp](std::stop_token stopToken) {
+      while (dtp.getQueueSize() != 0) {
+        auto qsize = dtp.getQueueSize();
+        logSync(std::cerr, "Qsize: " + std::to_string(qsize));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      }
+    });
+    while (dtp.getQueueSize() != 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    dtp.printStats();
+    logSync(std::cout, "\n -------------------  processing complete -------------------------- \n");
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+  }
+  return 0;
+}

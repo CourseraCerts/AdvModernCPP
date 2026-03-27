@@ -19,3 +19,6 @@ target_link_libraries(M2s40 PRIVATE Threads::Threads)
 add_executable(M2s40_2 async_task_mgr_custom.cpp)
 target_link_libraries(M2s40 PRIVATE Threads::Threads)
 
+add_executable(M2s41 threadpool_prioritySched.cpp)
+target_link_libraries(M2s40 PRIVATE Threads::Threads)
+
