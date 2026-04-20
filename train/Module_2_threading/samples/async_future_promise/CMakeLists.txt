@@ -25,4 +25,5 @@ target_link_libraries(M2s40 PRIVATE Threads::Threads)
 add_executable(M2s42 lockfree_ds_and_mem_order.cpp)
 target_link_libraries(M2s40 PRIVATE Threads::Threads)
 
-
+add_executable(M2s43 integrated_concurrency_arch.cpp)
+target_link_libraries(M2s40 PRIVATE Threads::Threads)
